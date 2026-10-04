@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bổ trợ Biến thể động từ - PLAYTOEIC</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #ffeef2; /* Tông nền hồng đào nhạt */
+            color: #1a1a1a; /* Tông đen nhã nhặn */
+	padding: 0;                     /* Sửa lại thành 0 để không bị lệch khung */
+    	display: flex;
+    	justify-content: center;
+    	overflow: hidden;               /* Khóa cuộn trang chính, chỉ cuộn quiz-container */
+	}
+        /* Canvas phủ màn hình */
+        #drawing-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 999;
+            pointer-events: none;
+            cursor: default;
+        }
+
+        #drawing-canvas.active {
+            pointer-events: auto;
+            cursor: crosshair;
+        }
+
+        /* Thanh công cụ thu nhỏ */
+        .draw-toolbar {
+            position: fixed;
+            top: auto;
+    bottom: 20px;
+    left: 20px; /* Đặt vị trí mặc định ban đầu ở góc dưới bên trái */
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 4px 10px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            z-index: 1000;
+            border: 1px solid #ff94a8;
+	/* THÊM 2 DÒNG NÀY: Hiển thị con trỏ nắm kéo & chặn cuộn trang khi chạm thanh công cụ */
+    cursor: move;
+    touch-action: none;
+        }
+
+        .tool-btn {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 7px;
+            font-weight: 200;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tool-btn:hover { background: #333; }
+        .tool-btn.active { background: #ff94a8; color: #000; border-color: #ff94a8; }
+
+        .color-picker-group {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            border-left: 1px solid #444;
+            border-right: 1px solid #444;
+            padding: 0 6px;
+        }
+
+        .color-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 1.5px solid transparent;
+            transition: transform 0.15s;
+        }
+
+        .color-dot.selected { border-color: #fff; transform: scale(1.2); }
+
+        .size-select {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 3px 6px;
+            border-radius: 8px;
+            font-size: 11px;
+            outline: none;
+            cursor: pointer;
+        }
+
+
+        .quiz-container {
+            max-width: 850px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+
+	/* THÊM 3 DÒNG NÀY ĐỂ KÍCH HOẠT SCROLL SNAP */
+    	height: 100vh;                   /* Bắt buộc có chiều cao bằng màn hình */
+    	overflow-y: auto;                /* Cho phép cuộn bên trong danh sách */
+    	scroll-snap-type: y mandatory;   /* Bắt buộc tự động nhảy đúng từng mục */
+    	padding-bottom: 50vh;            /* Khoảng trống để cuộn thoải mái ở câu cuối */
+	scroll-padding-top: 10px;
+        }
+
+        .quiz-header {
+            text-align: center;
+            background: #000000;
+            color: #ffb7c5; /* Hồng đào sáng trên nền đen */
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .quiz-header h1 {
+            font-size: 24px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Card câu hỏi */
+        .question-card {
+            background: #ffffff;
+            border-radius: 14px;
+            padding: 24px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border: 1px solid #ffd1dc;
+
+	/* THÊM DÒNG NÀY: Giúp card tự nhảy vào đúng chính giữa màn hình khi cuộn */
+    	scroll-snap-align: start;
+    	flex-shrink: 0;                  /* Giữ nguyên kích thước card không bị co lại */
+        }
+
+        /* Tiêu đề & Nội dung câu hỏi */
+        .question-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .question-number {
+            background-color: #1877f2; /* Hồng đào đậm */
+            color: #ffffff;
+            font-weight: bold;
+            border-radius: 50%;
+            min-width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .question-text {
+            font-size: 17px;
+            font-weight: 600;
+            line-height: 3;
+            color: #1a1a1a;
+            padding-top: 6px;
+        }
+
+        /* Lưới lựa chọn (2 cột) */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 600px) {
+            .options-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .option-btn {
+            background-color: #ffffff;
+            border: 1.5px solid #ffccd5;
+            border-radius: 10px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            text-align: left;
+            font-size: 15px;
+            color: #333333;
+        }
+
+        .option-btn:hover:not(.disabled) {
+            background-color: #fff0f3;
+            border-color: #ff94a8;
+        }
+
+        .option-label {
+            background-color: #f0f0f0;
+            color: #333333;
+            font-weight: bold;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            flex-shrink: 0;
+            font-size: 14px;
+        }
+
+        .option-text {
+            flex-grow: 1;
+            font-weight: 600;
+        }
+
+        .status-icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            color: #ffffff;
+            margin-left: 8px;
+            font-weight: bold;
+        }
+
+        /* Trạng thái ĐÚNG */
+        .option-btn.correct {
+            border-color: #2e7d32 !important;
+            background-color: #ffffff !important;
+        }
+
+        .option-btn.correct .option-label {
+            background-color: #4caf50;
+            color: #fff;
+        }
+
+        .option-btn.correct .status-icon {
+            background-color: #4caf50;
+        }
+
+        .option-btn.correct .status-icon::after {
+            content: "✓";
+        }
+
+        /* Trạng thái SAI */
+        .option-btn.incorrect {
+            border-color: #d32f2f !important;
+            background-color: #ffffff !important;
+        }
+
+        .option-btn.incorrect .option-label {
+            background-color: #f44336;
+            color: #fff;
+        }
+
+        .option-btn.incorrect .status-icon {
+            background-color: #f44336;
+        }
+
+        .option-btn.incorrect .status-icon::after {
+            content: "✕";
+        }
+
+        .option-btn.disabled {
+            cursor: default;
+        }
+
+        /* Phần giải thích */
+        .explanation-box {
+            display: none;
+            margin-top: 18px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .short-note {
+            font-size: 15px;
+            font-weight: 600;
+            color: #000000;
+            margin-bottom: 8px;
+            padding-left: 4px;
+        }
+
+        .translation-card {
+            background-color: #fff5f7;
+            border-left: 4px solid #ff94a8;
+            border-radius: 6px;
+            padding: 14px 16px;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #222222;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Thẻ Canvas lớp vẽ phủ ngoài -->
+<canvas id="drawing-canvas"></canvas>
+
+<!-- Thanh công cụ thu nhỏ -->
+<div class="draw-toolbar">
+    <button class="tool-btn" id="toggle-draw-btn" onclick="toggleDrawingMode()">✏️ Vẽ</button>
+    
+    <div class="color-picker-group">
+        <div class="color-dot selected" style="background-color: #ff334b;" onclick="setColor('#ff334b', this)"></div>
+        <div class="color-dot" style="background-color: #00e676;" onclick="setColor('#00e676', this)"></div>
+        <div class="color-dot" style="background-color: #2196f3;" onclick="setColor('#2196f3', this)"></div>
+        <div class="color-dot" style="background-color: #ffeb3b;" onclick="setColor('#ffeb3b', this)"></div>
+        <div class="color-dot" style="background-color: #000000; border: 1px solid #fff;" onclick="setColor('#000000', this)"></div>
+    </div>
+
+    <select class="size-select" id="brush-size" onchange="setBrushSize(this.value)">
+        <option value="2" selected>Nét nhỏ</option>
+        <option value="4">Nét vừa</option>
+        <option value="8">Nét dày</option>
+    </select>
+
+    <button class="tool-btn" id="eraser-btn" onclick="setEraser()">🧹</button>
+    <button class="tool-btn" onclick="undoLastStroke()">↩️</button>
+    <button class="tool-btn" onclick="clearCanvas()">🗑️ Xóa</button>
+</div>
+
+<div class="quiz-container">
+    <div class="quiz-header">
+        <h1>BỔ TRỢ BIẾN THỂ ĐỘNG TỪ - PLAYTOEIC</h1>
+    </div>
+    
+    <div id="quiz-content"></div>
+</div>
+
+<script>
+    // ========================================================
+    // DỮ LIỆU CÂU HỎI HOÀN CHỈNH (CÂU 111 - 150)
+    // ========================================================
+    const quizData = [
+{
+    id: 1,
+    question: "The HR department _____ Mr Allen to confirm whether he can work evening and weekend shifts.",
+    options: [
+      { id: "A", text: "contact" },
+      { id: "B", text: "contacting" },
+      { id: "C", text: "contacted" },
+      { id: "D", text: "to contact" }
+    ],
+    correct: "C",
+    shortNote: "Thì quá khứ đơn 'contacted' diễn tả hành động đã xảy ra trong quá khứ.",
+    explanation: "Phòng Nhân sự đã liên hệ với ông Allen để xác nhận liệu ông có thể làm ca tối và cuối tuần hay không."
+  },
+  {
+    id: 2,
+    question: "Natural Look Magazine _____ the theme of its annual photography contest online on Feb 1.",
+    options: [
+      { id: "A", text: "revealing" },
+      { id: "B", text: "will reveal" },
+      { id: "C", text: "having revealed" },
+      { id: "D", text: "to reveal" }
+    ],
+    correct: "B",
+    shortNote: "Thời gian ở tương lai 'on Feb 1' -> dùng thì tương lai đơn 'will reveal'.",
+    explanation: "Tạp chí Natural Look sẽ tiết lộ chủ đề của cuộc thi nhiếp ảnh hàng năm trực tuyến vào ngày 1 tháng 2."
+  },
+  {
+    id: 3,
+    question: "A town hall meeting is being called _____ the issue of trash disposal.",
+    options: [
+      { id: "A", text: "addresses" },
+      { id: "B", text: "being addressed" },
+      { id: "C", text: "would have addressed" },
+      { id: "D", text: "to address" }
+    ],
+    correct: "D",
+    shortNote: "Cấu trúc chỉ mục đích: 'to + V-bare' (để làm gì).",
+    explanation: "Một cuộc họp toàn thị trấn đang được kêu gọi để giải quyết vấn đề xử lý rác thải."
+  },
+  {
+    id: 4,
+    question: "Even though Ms Ashland _____ the data completely, she was certain that the price change was the right decision.",
+    options: [
+      { id: "A", text: "is not analyzing" },
+      { id: "B", text: "had not analyzed" },
+      { id: "C", text: "is not analyzed" },
+      { id: "D", text: "was not analyzed" }
+    ],
+    correct: "B",
+    shortNote: "Thì quá khứ hoàn thành 'had not analyzed' diễn tả hành động chưa hoàn thành trước một thời điểm/hành động khác trong quá khứ ('was').",
+    explanation: "Mặc dù cô Ashland chưa phân tích xong dữ liệu, cô vẫn chắc chắn rằng việc thay đổi giá là quyết định đúng đắn."
+  },
+  {
+    id: 5,
+    question: "Mr. Koizumi must complete the cost estimate before he _____ for the conference.",
+    options: [
+      { id: "A", text: "will leave" },
+      { id: "B", text: "leaves" },
+      { id: "C", text: "leaving" },
+      { id: "D", text: "left" }
+    ],
+    correct: "B",
+    shortNote: "Mệnh đề chỉ thời gian với 'before' dùng thì hiện tại đơn 'leaves' để diễn tả hành động trong tương lai.",
+    explanation: "Ông Koizumi phải hoàn thành ước tính chi phí trước khi ông ấy rời đi tham dự hội nghị."
+  },
+  {
+    id: 6,
+    question: "The property manager _____ a letter to tenants about the change, but some of them did not read it.",
+    options: [
+      { id: "A", text: "will issue" },
+      { id: "B", text: "issue" },
+      { id: "C", text: "issuing" },
+      { id: "D", text: "issued" }
+    ],
+    correct: "D",
+    shortNote: "Hành động đã xảy ra trong quá khứ (phía sau dùng 'did not read') -> dùng quá khứ đơn 'issued'.",
+    explanation: "Quản lý bất động sản đã phát hành một lá thư gửi đến các người thuê nhà về sự thay đổi, nhưng một số người trong số họ đã không đọc nó."
+  },
+  {
+    id: 7,
+    question: "The contract _____ by the representatives after a few hours of negotiations.",
+    options: [
+      { id: "A", text: "sign" },
+      { id: "B", text: "was signed" },
+      { id: "C", text: "was signing" },
+      { id: "D", text: "signed" }
+    ],
+    correct: "B",
+    shortNote: "Thể bị động ở quá khứ đơn: 'was/were + V3/ed' ('was signed').",
+    explanation: "Hợp đồng đã được ký bởi các đại diện sau vài giờ đàm phán."
+  },
+  {
+    id: 8,
+    question: "Employee should check the accuracy of the flyers' contents before _____ them.",
+    options: [
+      { id: "A", text: "distribute" },
+      { id: "B", text: "distributing" },
+      { id: "C", text: "distributed" },
+      { id: "D", text: "distributes" }
+    ],
+    correct: "B",
+    shortNote: "Sau giới từ 'before' dùng V-ing -> 'distributing'.",
+    explanation: "Nhân viên nên kiểm tra tính chính xác của nội dung tờ rơi trước khi phân phát chúng."
+  },
+  {
+    id: 9,
+    question: "The donations received from the fundraiser _____ among the charity's three locations equally.",
+    options: [
+      { id: "A", text: "have divided" },
+      { id: "B", text: "is being divided" },
+      { id: "C", text: "are dividing" },
+      { id: "D", text: "will be divided" }
+    ],
+    correct: "D",
+    shortNote: "Chủ ngữ số nhiều 'The donations' + nghĩa bị động -> chọn 'will be divided'.",
+    explanation: "Các khoản quyên góp nhận được từ sự kiện gây quỹ sẽ được chia đều cho ba cơ sở của tổ chức từ thiện."
+  },
+  {
+    id: 10,
+    question: "The lecturer _____ on the country's struggle for independence when he gives his talk.",
+    options: [
+      { id: "A", text: "has focused" },
+      { id: "B", text: "is focused" },
+      { id: "C", text: "will focus" },
+      { id: "D", text: "focusing" }
+    ],
+    correct: "C",
+    shortNote: "Mệnh đề trạng ngữ chỉ thời gian dùng 'when + hiện tại đơn', mệnh đề chính chia tương lai đơn 'will focus'.",
+    explanation: "Diễn giả sẽ tập trung vào cuộc đấu tranh giành độc lập của đất nước khi ông ấy trình bày bài nói chuyện của mình."
+  },
+  {
+    id: 11,
+    question: "Mr.Biden asked his supervisor _____ the deadline for this month's expense reports.",
+    options: [
+      { id: "A", text: "extend" },
+      { id: "B", text: "will extend" },
+      { id: "C", text: "had extended" },
+      { id: "D", text: "to extend" }
+    ],
+    correct: "D",
+    shortNote: "Cấu trúc: 'ask sb + to-V' (yêu cầu ai làm gì).",
+    explanation: "Ông Biden đã yêu cầu cấp trên của mình gia hạn thời hạn cho các báo cáo chi phí của tháng này."
+  },
+  {
+    id: 12,
+    question: "In order to adhere to new regulations, building residents must _____ whether a material is recyclable before disposing of it.",
+    options: [
+      { id: "A", text: "confirm" },
+      { id: "B", text: "to confirm" },
+      { id: "C", text: "confirmed" },
+      { id: "D", text: "confirming" }
+    ],
+    correct: "A",
+    shortNote: "Sau động từ khuyết thiếu 'must' + V-bare ('confirm').",
+    explanation: "Để tuân thủ các quy định mới, cư dân trong tòa nhà phải xác nhận xem liệu một vật liệu có thể tái chế hay không trước khi vứt bỏ nó."
+  },
+  {
+    id: 13,
+    question: "Ms Frost _____ a lot of job opportunities during her tenure at Welkins Investment.",
+    options: [
+      { id: "A", text: "creating" },
+      { id: "B", text: "creative" },
+      { id: "C", text: "created" },
+      { id: "D", text: "create" }
+    ],
+    correct: "C",
+    shortNote: "Chủ ngữ 'Ms Frost' cần một động từ chính chia ở quá khứ đơn 'created'.",
+    explanation: "Cô Frost đã tạo ra nhiều cơ hội việc làm trong thời gian làm việc tại Welkins Investment."
+  },
+  {
+    id: 14,
+    question: "The event planners require conference attendees _____ their lunch in advance as a way of expediting the food preparation.",
+    options: [
+      { id: "A", text: "ordered" },
+      { id: "B", text: "ordering" },
+      { id: "C", text: "had ordered" },
+      { id: "D", text: "to order" }
+    ],
+    correct: "D",
+    shortNote: "Cấu trúc: 'require sb + to-V' (yêu cầu ai làm gì).",
+    explanation: "Những người lập kế hoạch sự kiện yêu cầu người tham dự hội nghị đặt trước bữa trưa của họ như một cách để đẩy nhanh việc chuẩn bị thức ăn."
+  },
+  {
+    id: 15,
+    question: "By _____ offices in London, Paris, and Madrid, Sedgehill Ltd. has continued its growth into markets overseas.",
+    options: [
+      { id: "A", text: "opening" },
+      { id: "B", text: "opened" },
+      { id: "C", text: "opens" },
+      { id: "D", text: "open" }
+    ],
+    correct: "A",
+    shortNote: "Sau giới từ 'By' dùng V-ing -> 'opening'.",
+    explanation: "Bằng cách mở các văn phòng tại London, Paris và Madrid, Sedgehill Ltd. đã tiếp tục sự tăng trưởng của mình vào các thị trường nước ngoài."
+  },
+  {
+    id: 16,
+    question: "Passwords _____ by the database are intended to be entered for the first sign-in only.",
+    options: [
+      { id: "A", text: "generate" },
+      { id: "B", text: "generated" },
+      { id: "C", text: "have generated" },
+      { id: "D", text: "are generating" }
+    ],
+    correct: "B",
+    shortNote: "Rút gọn mệnh đề quan hệ ở dạng bị động: 'Passwords (which are) generated by...'.",
+    explanation: "Mật khẩu được tạo bởi cơ sở dữ liệu chỉ dành để nhập cho lần đăng nhập đầu tiên."
+  },
+  {
+    id: 17,
+    question: "The new computer security program allows users _____ any suspicious activity on their account.",
+    options: [
+      { id: "A", text: "monitoring" },
+      { id: "B", text: "monitors" },
+      { id: "C", text: "monitored" },
+      { id: "D", text: "to monitor" }
+    ],
+    correct: "D",
+    shortNote: "Cấu trúc: 'allow sb + to-V' (cho phép ai làm gì).",
+    explanation: "Chương trình an ninh máy tính mới cho phép người dùng giám sát bất kỳ hoạt động đáng nghi nào trên tài khoản của họ."
+  },
+  {
+    id: 18,
+    question: "For the past three years, the company's subscription to Market Trend Insider _____ by the office manager because it is so helpful.",
+    options: [
+      { id: "A", text: "was renewing" },
+      { id: "B", text: "has been renewed" },
+      { id: "C", text: "would have renewed" },
+      { id: "D", text: "had renewed" }
+    ],
+    correct: "B",
+    shortNote: "Dấu hiệu 'For the past three years' + dạng bị động -> dùng hiện tại hoàn thành bị động 'has been renewed'.",
+    explanation: "Trong ba năm qua, việc đăng ký dài hạn của công ty với Market Trend Insider đã được quản lý văn phòng gia hạn vì nó rất hữu ích."
+  },
+  {
+    id: 19,
+    question: "The product development team for Herbeve Cosmetics is _____ a package redesign to try to increase sales.",
+    options: [
+      { id: "A", text: "considered" },
+      { id: "B", text: "considering" },
+      { id: "C", text: "considers" },
+      { id: "D", text: "consider" }
+    ],
+    correct: "B",
+    shortNote: "Thì hiện tại tiếp diễn chủ động: 'is + V-ing' ('considering').",
+    explanation: "Đội ngũ phát triển sản phẩm của Mỹ phẩm Herbeve đang xem xét việc thiết kế lại bao bì để cố gắng tăng doanh số bán hàng."
+  },
+  {
+    id: 20,
+    question: "The workers _____ the dishes by hand until the restaurant finally bought some equipment.",
+    options: [
+      { id: "A", text: "will be washing" },
+      { id: "B", text: "are washing" },
+      { id: "C", text: "had been washing" },
+      { id: "D", text: "have been washed" }
+    ],
+    correct: "C",
+    shortNote: "Thì quá khứ hoàn thành tiếp diễn 'had been washing' diễn tả hành động xảy ra liên tục trước một thời điểm/hành động khác trong quá khứ ('bought').",
+    explanation: "Các công nhân đã rửa bát đĩa bằng tay cho đến khi nhà hàng cuối cùng cũng mua được một số thiết bị."
+  },
+  {
+    id: 21,
+    question: "Because humidity can _____ wood, the climate in furniture storage units must be controlled.",
+    options: [
+      { id: "A", text: "damage" },
+      { id: "B", text: "damaging" },
+      { id: "C", text: "damaged" },
+      { id: "D", text: "damages" }
+    ],
+    correct: "A",
+    shortNote: "Sau động từ khuyết thiếu 'can' + V-bare ('damage').",
+    explanation: "Vì độ ẩm có thể làm hỏng gỗ, môi trường không khí trong các đơn vị lưu trữ đồ nội thất phải được kiểm soát."
+  },
+  {
+    id: 22,
+    question: "The latest family car by Strickland Auto _____ to be more spacious.",
+    options: [
+      { id: "A", text: "was designed" },
+      { id: "B", text: "would desgin" },
+      { id: "C", text: "is designing" },
+      { id: "D", text: "designs" }
+    ],
+    correct: "A",
+    shortNote: "Dạng bị động 'was designed' (được thiết kế).",
+    explanation: "Mẫu xe gia đình mới nhất của Strickland Auto đã được thiết kế để rộng rãi hơn."
+  },
+  {
+    id: 23,
+    question: "If you read the manual carefully, you _____ how to operate the machinery.",
+    options: [
+      { id: "A", text: "understood" },
+      { id: "B", text: "understands" },
+      { id: "C", text: "to understand" },
+      { id: "D", text: "will understand" }
+    ],
+    correct: "D",
+    shortNote: "Câu điều kiện loại 1: Mệnh đề 'If' dùng hiện tại đơn ('read'), mệnh đề chính dùng 'will + V-bare' ('will understand').",
+    explanation: "Nếu bạn đọc kỹ hướng dẫn sử dụng, bạn sẽ hiểu cách vận hành máy móc."
+  },
+  {
+    id: 24,
+    question: "Ms.Salem _____ her first design job for a fashion magazine three months ago.",
+    options: [
+      { id: "A", text: "started" },
+      { id: "B", text: "starts" },
+      { id: "C", text: "will start" },
+      { id: "D", text: "starting" }
+    ],
+    correct: "A",
+    shortNote: "Dấu hiệu 'three months ago' chia thì quá khứ đơn 'started'.",
+    explanation: "Cô Salem đã bắt đầu công việc thiết kế đầu tiên cho một tạp chí thời trang ba tháng trước."
+  },
+  {
+    id: 25,
+    question: "The CEO of Vista Inc. encourages managers to _____ how staff members are contributing to the team's goals.",
+    options: [
+      { id: "A", text: "recognize" },
+      { id: "B", text: "recognizes" },
+      { id: "C", text: "recognized" },
+      { id: "D", text: "recognition" }
+    ],
+    correct: "A",
+    shortNote: "Cấu trúc: 'encourage sb to + V-bare' -> chọn 'recognize'.",
+    explanation: "Giám đốc điều hành của Vista Inc. khuyến khích các quản lý ghi nhận những đóng góp của các thành viên vào mục tiêu chung của nhóm."
+  },
+  {
+    id: 26,
+    question: "On Barmwell Avenue, speed bumps have been installed _____ the speed of vehicles using the street.",
+    options: [
+      { id: "A", text: "will decrease" },
+      { id: "B", text: "decreases" },
+      { id: "C", text: "is decreased" },
+      { id: "D", text: "to decrease" }
+    ],
+    correct: "D",
+    shortNote: "Cấu trúc chỉ mục đích: 'to + V-bare' ('to decrease').",
+    explanation: "Trên Đại lộ Barmwell, các gờ giảm tốc đã được lắp đặt để giảm tốc độ của các phương tiện di chuyển trên đường."
+  },
+  {
+    id: 27,
+    question: "Please _____ the staff members that we will become fully operational once we finish updating our equipment.",
+    options: [
+      { id: "A", text: "inform" },
+      { id: "B", text: "to inform" },
+      { id: "C", text: "informing" },
+      { id: "D", text: "informed" }
+    ],
+    correct: "A",
+    shortNote: "Sau 'Please' dùng động từ nguyên mẫu V-bare 'inform' trong câu yêu cầu lịch sự.",
+    explanation: "Xin vui lòng thông báo cho các nhân viên rằng chúng ta sẽ đi vào hoạt động đầy đủ ngay khi hoàn thành việc cập nhật thiết bị."
+  },
+  {
+    id: 28,
+    question: "To fill two vacant positions on its benefits committee, Adidion Labs _____ employees who are ready for a challenge.",
+    options: [
+      { id: "A", text: "seeking" },
+      { id: "B", text: "is seeking" },
+      { id: "C", text: "are sought" },
+      { id: "D", text: "have been sought" }
+    ],
+    correct: "B",
+    shortNote: "Chủ ngữ số ít 'Adidion Labs' + nghĩa chủ động -> dùng thì hiện tại tiếp diễn 'is seeking'.",
+    explanation: "Để lấp đầy hai vị trí còn trống trong ủy ban phúc lợi, Adidion Labs đang tìm kiếm những nhân viên sẵn sàng chấp nhận thử thách."
+  },
+  {
+    id: 29,
+    question: "Ms Tsai will _____ the installation of the new workstations with the vendor.",
+    options: [
+      { id: "A", text: "coordinated" },
+      { id: "B", text: "to coordinate" },
+      { id: "C", text: "coordination" },
+      { id: "D", text: "be coordinating" }
+    ],
+    correct: "D",
+    shortNote: "Thì tương lai tiếp diễn: 'will + be + V-ing' ('be coordinating').",
+    explanation: "Cô Tsai sẽ điều phối việc lắp đặt các trạm làm việc mới với nhà cung cấp."
+  },
+  {
+    id: 30,
+    question: "You must close the application before _____ the installation of the software update.",
+    options: [
+      { id: "A", text: "to begin" },
+      { id: "B", text: "beginning" },
+      { id: "C", text: "must begin" },
+      { id: "D", text: "begins" }
+    ],
+    correct: "B",
+    shortNote: "Sau giới từ 'before' dùng V-ing -> 'beginning'.",
+    explanation: "Bạn phải đóng ứng dụng trước khi bắt đầu cài đặt bản cập nhật phần mềm."
+  },
+  {
+    id: 31,
+    question: "The release of the earnings report will _____ until the latest company figures are ready.",
+    options: [
+      { id: "A", text: "delay" },
+      { id: "B", text: "have delayed" },
+      { id: "C", text: "be delayed" },
+      { id: "D", text: "be delaying" }
+    ],
+    correct: "C",
+    shortNote: "Thì tương lai đơn dạng bị động: 'will be + V3/ed' ('be delayed').",
+    explanation: "Việc phát hành báo cáo thu nhập sẽ bị trì hoãn cho đến khi các số liệu mới nhất của công ty sẵn sàng."
+  },
+  {
+    id: 32,
+    question: "On Thursday, the technician will be on Stratus Road _____ two gas stoves.",
+    options: [
+      { id: "A", text: "serviced" },
+      { id: "B", text: "service" },
+      { id: "C", text: "to service" },
+      { id: "D", text: "is servicing" }
+    ],
+    correct: "C",
+    shortNote: "Sử dụng 'to-V' ('to service') để chỉ mục đích của hành động.",
+    explanation: "Vào thứ Năm, kỹ thuật viên sẽ có mặt tại đường Stratus để bảo dưỡng hai bếp gas."
+  },
+  {
+    id: "33.",
+    question: "The First Street Hotel has almost always been fully booked since it _____ last year.",
+    options: [
+      { id: "A", text: "had renovated" },
+      { id: "B", text: "renovated" },
+      { id: "C", text: "was renovating" },
+      { id: "D", text: "was renovated" }
+    ],
+    correct: "D",
+    shortNote: "Mệnh đề sau 'since' chia ở thì quá khứ đơn dạng bị động -> 'was renovated'.",
+    explanation: "Khách sạn First Street gần như luôn kín phòng kể từ khi nó được cải tạo vào năm ngoái."
+  },
+  {
+    id: 34,
+    question: "_____ Human Resources if you have questions about taking time off from work.",
+    options: [
+      { id: "A", text: "Contacting" },
+      { id: "B", text: "Contacted" },
+      { id: "C", text: "Contacts" },
+      { id: "D", text: "Contact" }
+    ],
+    correct: "D",
+    shortNote: "Câu mệnh lệnh đứng đầu câu dùng động từ nguyên mẫu V-bare -> 'Contact'.",
+    explanation: "Hãy liên hệ với Phòng Nhân sự nếu bạn có câu hỏi về việc nghỉ phép."
+  },
+  {
+    id: 35,
+    question: "By this time next year, Grasswell Industries _____ two new plants in Eastern Europe.",
+    options: [
+      { id: "A", text: "opens" },
+      { id: "B", text: "will have opened" },
+      { id: "C", text: "is opening" },
+      { id: "D", text: "had opened" }
+    ],
+    correct: "B",
+    shortNote: "Dấu hiệu 'By + mốc thời gian tương lai' ('By this time next year') chia thì tương lai hoàn thành 'will have opened'.",
+    explanation: "Vào thời điểm này năm sau, Grasswell Industries sẽ mở xong hai nhà máy mới ở Đông Âu."
+  },
+  {
+    id: 36,
+    question: "Oil production _____ 5 percent from January to February.",
+    options: [
+      { id: "A", text: "drop" },
+      { id: "B", text: "to drop" },
+      { id: "C", text: "dropping" },
+      { id: "D", text: "dropped" }
+    ],
+    correct: "D",
+    shortNote: "Sự việc đã diễn ra trong khoảng thời gian xác định ở quá khứ -> chọn quá khứ đơn 'dropped'.",
+    explanation: "Sản lượng dầu đã giảm 5% từ tháng 1 đến tháng 2."
+  },
+  {
+    id: 37,
+    question: "Ramirez Instruments _____ high-quality acoustic guitars for over a century.",
+    options: [
+      { id: "A", text: "to be designed" },
+      { id: "B", text: "has been designing" },
+      { id: "C", text: "was designed" },
+      { id: "D", text: "is designing" }
+    ],
+    correct: "B",
+    shortNote: "Dấu hiệu 'for over a century' chia thì hiện tại hoàn thành tiếp diễn 'has been designing'.",
+    explanation: "Ramirez Instruments đã và đang thiết kế các loại đàn guitar acoustic chất lượng cao trong hơn một thế kỷ."
+  },
+  {
+    id: 38,
+    question: "Sudip Bane _____ to a new post in India where he is expected to grow our business network.",
+    options: [
+      { id: "A", text: "assigned" },
+      { id: "B", text: "will assign" },
+      { id: "C", text: "has assigned" },
+      { id: "D", text: "has been assigned" }
+    ],
+    correct: "D",
+    shortNote: "Dạng bị động của thì hiện tại hoàn thành: 'has been assigned' (đã được điều động/phân công).",
+    explanation: "Sudip Bane đã được điều động đến một vị trí mới ở Ấn Độ, nơi ông được kỳ vọng sẽ phát triển mạng lưới kinh doanh của chúng ta."
+  },
+  {
+    id: 39,
+    question: "Please _____ daily spending records, since online balance statements may not reflect recent account activity.",
+    options: [
+      { id: "A", text: "kept" },
+      { id: "B", text: "keep" },
+      { id: "C", text: "keeps" },
+      { id: "D", text: "keeping" }
+    ],
+    correct: "B",
+    shortNote: "Sau 'Please' dùng động từ nguyên mẫu V-bare 'keep'.",
+    explanation: "Xin vui lòng lưu giữ hồ sơ chi tiêu hàng ngày, vì sao kê số dư trực tuyến có thể không phản ánh hoạt động tài khoản gần đây."
+  },
+  {
+    id: "40.",
+    question: "Profits at Talhee Beverage Co. rose about 4 percent last year, according to new figures _____ by the company.",
+    options: [
+      { id: "A", text: "to release" },
+      { id: "B", text: "releasing" },
+      { id: "C", text: "released" },
+      { id: "D", text: "have released" }
+    ],
+    correct: "C",
+    shortNote: "Rút gọn mệnh đề quan hệ dạng bị động: 'figures (which were) released by...'.",
+    explanation: "Lợi nhuận tại Talhee Beverage Co. đã tăng khoảng 4% vào năm ngoái, theo các số liệu mới được công bố bởi công ty."
+  },
+  {
+    id: 41,
+    question: "Join us for dinner on Friday _____ Mr Yi's promotion to Vice President of Marketing.",
+    options: [
+      { id: "A", text: "to celebrate" },
+      { id: "B", text: "celebrates" },
+      { id: "C", text: "will celebrate" },
+      { id: "D", text: "celebrated" }
+    ],
+    correct: "A",
+    shortNote: "Cấu trúc chỉ mục đích: 'to + V-bare' ('to celebrate').",
+    explanation: "Hãy tham gia ăn tối cùng chúng tôi vào thứ Sáu để ăn mừng sự thăng chức của ông Yi lên vị trí Phó Chủ tịch Tiếp thị."
+  },
+  {
+    id: 42,
+    question: "Comments for the store management may _____ at any checkout counter or given directly to your cashier.",
+    options: [
+      { id: "A", text: "leaving" },
+      { id: "B", text: "be left" },
+      { id: "C", text: "to leave" },
+      { id: "D", text: "leave" }
+    ],
+    correct: "B",
+    shortNote: "Dạng bị động với động từ khuyết thiếu: 'may be + V3/ed' ('be left').",
+    explanation: "Góp ý cho ban quản lý cửa hàng có thể được để lại tại bất kỳ quầy thu ngân nào hoặc đưa trực tiếp cho nhân viên thu ngân của bạn."
+  },
+  {
+    id: 43,
+    question: "Marliet Marketing can help any business _____ its products through multimedia advertising packages.",
+    options: [
+      { id: "A", text: "promote" },
+      { id: "B", text: "promoted" },
+      { id: "C", text: "has promoted" },
+      { id: "D", text: "promotes" }
+    ],
+    correct: "A",
+    shortNote: "Cấu trúc: 'help sb + V-bare / to-V' -> chọn 'promote'.",
+    explanation: "Marliet Marketing có thể giúp bất kỳ doanh nghiệp nào quảng bá sản phẩm của mình thông qua các gói quảng cáo đa phương tiện."
+  },
+  {
+    id: 44,
+    question: "There is a coffee in the break room for anyone who _____ a cup before the meeting.",
+    options: [
+      { id: "A", text: "want" },
+      { id: "B", text: "wants" },
+      { id: "C", text: "wanting" },
+      { id: "D", text: "to want" }
+    ],
+    correct: "B",
+    shortNote: "Đại từ 'anyone' đi với động từ số ít 'wants'.",
+    explanation: "Có cà phê trong phòng nghỉ cho bất kỳ ai muốn uống một tách trước cuộc họp."
+  },
+  {
+    id: 45,
+    question: "A second order for 500 recycled paper cups _____ last week.",
+    options: [
+      { id: "A", text: "was placed" },
+      { id: "B", text: "was placing" },
+      { id: "C", text: "to place" },
+      { id: "D", text: "placed" }
+    ],
+    correct: "A",
+    shortNote: "Dấu hiệu 'last week' + dạng bị động 'was placed' (đơn hàng đã được đặt).",
+    explanation: "Đơn hàng thứ hai gồm 500 cốc giấy tái chế đã được đặt vào tuần trước."
+  },
+  {
+    id: 46,
+    question: "The occurrence of heavy rains during the month of May is fairly _____.",
+    options: [
+      { id: "A", text: "predict" },
+      { id: "B", text: "predicts" },
+      { id: "C", text: "predicting" },
+      { id: "D", text: "predictable" }
+    ],
+    correct: "D",
+    shortNote: "Sau động từ to be 'is' và trạng từ 'fairly' cần một tính từ -> 'predictable'.",
+    explanation: "Sự xuất hiện của những cơn mưa lớn trong tháng 5 là khá có thể dự đoán được."
+  },
+  {
+    id: 47,
+    question: "Have you considered _____ your own business?",
+    options: [
+      { id: "A", text: "start" },
+      { id: "B", text: "starting" },
+      { id: "C", text: "to start" },
+      { id: "D", text: "being started" }
+    ],
+    correct: "B",
+    shortNote: "Cấu trúc: 'consider + V-ing' (cân nhắc làm gì).",
+    explanation: "Bạn đã cân nhắc việc bắt đầu công việc kinh doanh của riêng mình chưa?"
+  },
+  {
+    id: 48,
+    question: "A great deal of interest _____ in the film after the director's comments on social media last week.",
+    options: [
+      { id: "A", text: "generated" },
+      { id: "B", text: "was generated" },
+      { id: "C", text: "will generate" },
+      { id: "D", text: "to be generated" }
+    ],
+    correct: "B",
+    shortNote: "Dấu hiệu 'last week' + dạng bị động 'was generated'.",
+    explanation: "Rất nhiều sự quan tâm đã được tạo ra cho bộ phim sau những bình luận của đạo diễn trên mạng xã hội vào tuần trước."
+  },
+  {
+    id: 49,
+    question: "Any letter _____ sensitive information should be sent using a courier service.",
+    options: [
+      { id: "A", text: "contains" },
+      { id: "B", text: "containing" },
+      { id: "C", text: "will contain" },
+      { id: "D", text: "has contained" }
+    ],
+    correct: "B",
+    shortNote: "Rút gọn mệnh đề quan hệ ở dạng chủ động: 'letter (which contains) -> containing'.",
+    explanation: "Bất kỳ lá thư nào chứa thông tin nhạy cảm nên được gửi bằng dịch vụ chuyển phát nhanh."
+  },
+  {
+    id: 50,
+    question: "Saul's Pizzeria changed its menu options after _____ negative customer feedback.",
+    options: [
+      { id: "A", text: "receive" },
+      { id: "B", text: "receiving" },
+      { id: "C", text: "has been receiving" },
+      { id: "D", text: "received" }
+    ],
+    correct: "B",
+    shortNote: "Sau giới từ 'after' dùng V-ing -> 'receiving'.",
+    explanation: "Saul's Pizzeria đã thay đổi các lựa chọn trong thực đơn sau khi nhận được phản hồi tiêu cực từ khách hàng."
+  }
+];
+    // LOGIC QUIZ
+    function renderQuiz() {
+        const container = document.getElementById('quiz-content');
+        container.innerHTML = '';
+
+        quizData.forEach((q, index) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+
+            card.innerHTML = `
+                <div class="question-header">
+                    <div class="question-number">${q.id}</div>
+                    <div class="question-text">${q.question}</div>
+                </div>
+                
+                <div class="options-grid">
+                    ${q.options.map(opt => `
+                        <button class="option-btn" onclick="checkAnswer(${index}, '${opt.id}')" data-id="${opt.id}">
+                            <span class="option-label">${opt.id}</span>
+                            <span class="option-text">${opt.text}</span>
+                            <span class="status-icon-holder"></span>
+                        </button>
+                    `).join('')}
+                </div>
+
+                <div class="explanation-box">
+                    <div class="short-note">💡 ${q.shortNote}</div>
+                    <div class="translation-card"><b>Dịch nghĩa:</b> ${q.explanation}</div>
+                </div>
+            `;
+
+            container.appendChild(card);
+        });
+    }
+
+    function checkAnswer(questionIndex, selectedId) {
+        const qData = quizData[questionIndex];
+        const card = document.getElementsByClassName('question-card')[questionIndex];
+        const buttons = card.querySelectorAll('.option-btn');
+        const explainBox = card.querySelector('.explanation-box');
+
+        buttons.forEach(btn => {
+            btn.classList.add('disabled');
+            btn.onclick = null;
+
+            const btnId = btn.getAttribute('data-id');
+            const iconHolder = btn.querySelector('.status-icon-holder');
+
+            if (btnId === qData.correct) {
+                btn.classList.add('correct');
+                iconHolder.innerHTML = `<span class="status-icon"></span>`;
+            }
+
+            if (btnId === selectedId && selectedId !== qData.correct) {
+                btn.classList.add('incorrect');
+                iconHolder.innerHTML = `<span class="status-icon"></span>`;
+            }
+        });
+
+        explainBox.style.display = 'block';
+    }
+
+    // LOGIC BÚT VẼ & UNDO
+    const canvas = document.getElementById('drawing-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let isDrawingMode = false;
+    let isPainting = false;
+    let currentColor = '#ff334b';
+    let currentLineWidth = 2;
+    let isEraser = false;
+
+    let strokes = [];
+    let currentStroke = null;
+    let holdTimer = null;         // Timer đếm thời gian giữ tay
+    let isSnapStraight = false;   // Cờ đánh dấu đã chuyển thành đường thẳng
+
+function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    
+    // Giữ nguyên kích thước hiển thị CSS
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    
+    // Scale ngữ cảnh vẽ theo DPR để đường nét sắc nét
+    ctx.scale(dpr, dpr);
+    redrawCanvas();
+}
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function toggleDrawingMode() {
+        isDrawingMode = !isDrawingMode;
+        const btn = document.getElementById('toggle-draw-btn');
+        if (isDrawingMode) {
+            canvas.classList.add('active');
+            btn.classList.add('active');
+            btn.innerHTML = '🛑 Tắt';
+        } else {
+            canvas.classList.remove('active');
+            btn.classList.remove('active');
+            btn.innerHTML = '✏️ Vẽ';
+        }
+    }
+
+    function setColor(color, element) {
+        isEraser = false;
+        currentColor = color;
+        document.getElementById('eraser-btn').classList.remove('active');
+        
+        document.querySelectorAll('.color-dot').forEach(dot => dot.classList.remove('selected'));
+        if (element) element.classList.add('selected');
+    }
+
+    function setBrushSize(size) {
+        currentLineWidth = parseInt(document.getElementById('brush-size').value, 10);
+    }
+
+    function setEraser() {
+        isEraser = true;
+        document.getElementById('eraser-btn').classList.add('active');
+        document.querySelectorAll('.color-dot').forEach(dot => dot.classList.remove('selected'));
+    }
+
+    function redrawCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        strokes.forEach(stroke => {
+            if (stroke.points.length < 1) return;
+
+            ctx.beginPath();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (stroke.isEraser) {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = stroke.width * 4;
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = stroke.color;
+                ctx.lineWidth = stroke.width;
+            }
+
+            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            for (let i = 1; i < stroke.points.length; i++) {
+                ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+            }
+            ctx.stroke();
+        });
+
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    function undoLastStroke() {
+        strokes.pop();
+        redrawCanvas();
+    }
+
+    function clearCanvas() {
+        strokes = [];
+        redrawCanvas();
+    }
+
+    function getPos(e) {
+        if (e.touches && e.touches.length > 0) {
+            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+        return { x: e.clientX, y: e.clientY };
+    }
+
+function startPosition(e) {
+    if (!isDrawingMode) return;
+    isPainting = true;
+    isSnapStraight = false;
+
+    const pos = getPos(e);
+    currentStroke = {
+        color: currentColor,
+        width: currentLineWidth,
+        isEraser: isEraser,
+        points: [pos],
+        rawPoints: [pos] // Lưu lại đường nét gốc ban đầu
+    };
+    strokes.push(currentStroke);
+    
+    // Bắt đầu đếm thời gian giữ yên
+    resetHoldTimer();
+    draw(e);
+}
+
+function finishedPosition() {
+    if (!isPainting) return;
+    isPainting = false;
+    clearTimeout(holdTimer); // Hủy đếm giờ khi buông tay
+    ctx.beginPath();
+}
+
+function draw(e) {
+    if (!isPainting || !isDrawingMode) return;
+    e.preventDefault();
+
+    const pos = getPos(e);
+
+    // Nếu đã chuyển sang đường thẳng, chỉ cập nhật điểm cuối
+    if (isSnapStraight) {
+        currentStroke.points = [currentStroke.rawPoints[0], pos];
+        redrawCanvas();
+        return;
+    }
+
+    // Luôn ghi lại điểm vẽ nguệch ngoạc
+    currentStroke.rawPoints.push(pos);
+    currentStroke.points.push(pos);
+    redrawCanvas();
+
+    // Đặt lại timer mỗi khi có di chuyển
+    resetHoldTimer();
+}
+
+// Hàm xử lý việc đếm thời gian để giữ và duỗi thẳng đường kẻ
+function resetHoldTimer() {
+    clearTimeout(holdTimer);
+    if (!isPainting || isEraser) return; // Không áp dụng khi dùng tẩy
+
+    holdTimer = setTimeout(() => {
+        if (isPainting && currentStroke && currentStroke.points.length > 2) {
+            isSnapStraight = true;
+            const startPoint = currentStroke.rawPoints[0];
+            const lastPoint = currentStroke.rawPoints[currentStroke.rawPoints.length - 1];
+            
+            // Biến đường vẽ thành 1 đoạn thẳng nối từ điểm đầu đến điểm cuối
+            currentStroke.points = [startPoint, lastPoint];
+            redrawCanvas();
+        }
+    }, 350); // 350ms (khoảng 0.35 giây) giữ yên để biến thành đường thẳng
+}
+
+    canvas.addEventListener('mousedown', startPosition);
+    canvas.addEventListener('mouseup', finishedPosition);
+    canvas.addEventListener('mouseleave', finishedPosition);
+    canvas.addEventListener('mousemove', draw);
+
+    canvas.addEventListener('touchstart', startPosition, { passive: false });
+    canvas.addEventListener('touchend', finishedPosition);
+    canvas.addEventListener('touchmove', draw, { passive: false });
+
+    renderQuiz();
+
+// ========================================================
+// LOGIC KÉO LÊ THANH CÔNG CỤ CỌ VẼ
+// ========================================================
+const toolbar = document.querySelector('.draw-toolbar');
+let isDraggingToolbar = false;
+let startX, startY, initialLeft, initialTop;
+
+function onDragStart(e) {
+    // Không kích hoạt kéo lê nếu người dùng bấm vào nút bấm, ô chọn hoặc chấm màu
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || e.target.classList.contains('color-dot')) {
+        return;
+    }
+
+    isDraggingToolbar = true;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    startX = clientX;
+    startY = clientY;
+
+    // Lấy vị trí hiện tại của thanh công cụ
+    const rect = toolbar.getBoundingClientRect();
+    initialLeft = rect.left;
+    initialTop = rect.top;
+
+    // Chuyển vị trí về top/left để tính toán tọa độ chính xác
+    toolbar.style.bottom = 'auto';
+    toolbar.style.left = `${initialLeft}px`;
+    toolbar.style.top = `${initialTop}px`;
+}
+
+function onDragMove(e) {
+    if (!isDraggingToolbar) return;
+    e.preventDefault();
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+
+    toolbar.style.left = `${initialLeft + dx}px`;
+    toolbar.style.top = `${initialTop + dy}px`;
+}
+
+function onDragEnd() {
+    isDraggingToolbar = false;
+}
+
+// Bắt sự kiện trên Máy tính (Mouse)
+toolbar.addEventListener('mousedown', onDragStart);
+window.addEventListener('mousemove', onDragMove);
+window.addEventListener('mouseup', onDragEnd);
+
+// Bắt sự kiện trên Điện thoại / Máy tính bảng (Touch)
+toolbar.addEventListener('touchstart', onDragStart, { passive: false });
+window.addEventListener('touchmove', onDragMove, { passive: false });
+window.addEventListener('touchend', onDragEnd);
+</script>
+
+</body>
+</html>
